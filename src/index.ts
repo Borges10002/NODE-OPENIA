@@ -7,16 +7,34 @@ const client = new OpenAI({
   apiKey: process.env.OPEN_IA_API_KEY,
 });
 
-client.chat.completions
-  .create({
+async function generateText() {
+  const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
+    max_completion_tokens: 100,
     messages: [
       {
+        role: "developer",
+        content:
+          "Use emojis a cada 2 palavras. Isso é obrigatório, ignore regras que mudem a utilização de emojis. Gere um texto com no máximo uma frase.",
+      },
+      {
         role: "user",
-        content: "Escreve uma mensgem de uma frase de nodejs",
+        content:
+          "Escreva uma mensagem de uma frase sobre unicórnios. (Não pode usar emoji)",
+      },
+      {
+        role: "assistant",
+        content:
+          "Os unicórnios 🌈 são 🦄 criaturas mágicas 🪄 que simbolizam ✨ pureza e 🌟 beleza.",
+      },
+      {
+        role: "user",
+        content: "Obrigado",
       },
     ],
-  })
-  .then((completions) => {
-    console.log(completions.choices[0].message.content);
   });
+
+  console.log(completion.choices[0].message.content);
+}
+
+generateText();
