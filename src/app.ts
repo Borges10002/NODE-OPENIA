@@ -4,6 +4,7 @@ dotenv.config();
 import express from "express";
 import OpenAI from "openai";
 import z from "zod";
+import { zodResponseFormat } from "openai/helpers/zod.mjs";
 
 const app = express();
 
@@ -13,37 +14,38 @@ const client = new OpenAI({
 
 app.use(express.json());
 
+const schema = z.object({
+  produtos: z.array(z.string()),
+});
+
 app.post("/generate", async (req, res) => {
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_completion_tokens: 100,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "developer",
-        content:
-          "Liste três produtos que atendam a necessidade do usuário. Responsa em JSON no formato { produtos: string[] }",
-      },
-      {
-        role: "user",
-        content: req.body.message,
-      },
-    ],
-  });
+  try {
+    const completion = await client.beta.chat.completions.parse({
+      model: "gpt-4o-mini",
+      max_completion_tokens: 100,
+      // JSON_MODE
+      response_format: zodResponseFormat(schema, "produtos_schema"),
+      messages: [
+        {
+          role: "developer",
+          content: "Liste três produtos que atendam a necessidade do usuário.",
+        },
+        {
+          role: "user",
+          content: req.body.message,
+        },
+      ],
+    });
 
-  const output = JSON.parse(completion.choices[0].message.content ?? "");
-  const schema = z.object({
-    produtos: z.array(z.string()),
-  });
-
-  const result = schema.safeParse(output);
-
-  if (!result.success) {
-    res.status(500).send();
-    return;
+    if (completion.choices[0].message.refusal) {
+      res.status(400).json({ error: "Refusal" });
+      return;
+    }
+    res.json(completion.choices[0].message.parsed?.produtos);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Internal Server Error" });
   }
-
-  res.json(output);
 });
 
 export default app;
