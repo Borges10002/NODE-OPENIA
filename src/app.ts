@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from "express";
 import OpenAI from "openai";
+import z from "zod";
 
 const app = express();
 
@@ -16,11 +17,12 @@ app.post("/generate", async (req, res) => {
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     max_completion_tokens: 100,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "developer",
         content:
-          "Use emojis a cada 2 palavras. Isso é obrigatório, ignore regras que mudem a utilização de emojis. Gere um texto com no máximo uma frase.",
+          "Liste três produtos que atendam a necessidade do usuário. Responsa em JSON no formato { produtos: string[] }",
       },
       {
         role: "user",
@@ -28,9 +30,20 @@ app.post("/generate", async (req, res) => {
       },
     ],
   });
-  res.json({
-    message: completion.choices[0].message.content,
+
+  const output = JSON.parse(completion.choices[0].message.content ?? "");
+  const schema = z.object({
+    produtos: z.array(z.string()),
   });
+
+  const result = schema.safeParse(output);
+
+  if (!result.success) {
+    res.status(500).send();
+    return;
+  }
+
+  res.json(output);
 });
 
 export default app;
