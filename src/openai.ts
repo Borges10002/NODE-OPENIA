@@ -46,23 +46,14 @@ const tools: ChatCompletionTool[] = [
   },
 ];
 
-export const generateProducts = async (message: string) => {
-  const messages: ChatCompletionMessageParam[] = [
-    {
-      role: "developer",
-      content:
-        "Liste três produtos que atendam a necessidade do usuário. Considere apenas os produtos em estoque.",
-    },
-    {
-      role: "user",
-      content: message,
-    },
-  ];
-
+const generateCompletion = async (
+  messages: ChatCompletionMessageParam[],
+  format: any
+) => {
   const completion = await client.beta.chat.completions.parse({
     model: "gpt-4o-mini",
     max_tokens: 100,
-    response_format: zodResponseFormat(schema, "produtos_schema"),
+    response_format: format,
     tools,
     messages,
   });
@@ -83,7 +74,41 @@ export const generateProducts = async (message: string) => {
       throw new Error("Function not found");
     }
     const result = functionToCall(tool_call.function.parsed_arguments);
+
+    messages.push(completion.choices[0].message);
+    messages.push({
+      role: "tool",
+      tool_call_id: tool_call.id,
+      content: result.toString(),
+    });
+
+    const completionWithToolResult = await generateCompletion(
+      messages,
+      zodResponseFormat(schema, "produtos_schema")
+    );
+    return completionWithToolResult;
   }
+
+  return completion;
+};
+
+export const generateProducts = async (message: string) => {
+  const messages: ChatCompletionMessageParam[] = [
+    {
+      role: "developer",
+      content:
+        "Liste três produtos que atendam a necessidade do usuário. Considere apenas os produtos em estoque.",
+    },
+    {
+      role: "user",
+      content: message,
+    },
+  ];
+
+  const completion = await generateCompletion(
+    messages,
+    zodResponseFormat(schema, "produtos_schema")
+  );
 
   return completion.choices[0].message.parsed;
 };
